@@ -1,0 +1,193 @@
+###Code by Alissa Gordon###
+
+##packages needed for cox regression survival analysis##
+library(survival)
+library(survminer)
+library(e1071)
+
+##establishing experimental variables/inputs##
+n<-170 #initial subgroup size (subgroups: primary and metastatic)
+
+#different subgroups will have different effect sizes 
+pmedian<-3 #primary lifespan median
+mmedian<-2 #metastatic lifespan median
+plambda<-log(2)/pmedian #finds lambda for which median of exp curve would be pmedian
+mlambda<-log(2)/mmedian #finds lambda for which median of exp curve would be mmedian
+#subgroup medians
+p1median<-3; p1lambda<-log(2)/p1median
+m1median<-2; m1lambda<-log(2)/m1median
+p2median<-2; p2lambda<-log(2)/p2median
+m2median<-3; m2lambda<-log(2)/m2median
+p3median<-2; p3lambda<-log(2)/p3median
+m3median<-3; m3lambda<-log(2)/m3median
+p4median<-3; p4lambda<-log(2)/p4median
+m4median<-2; m4lambda<-log(2)/m4median
+p5median<-3; p5lambda<-log(2)/p5median
+m5median<-2; m5lambda<-log(2)/m5median
+replications<-100
+alpha<-0.1
+beta<-0.1
+yearsrecruiting<-3 #years spent recruiting participants
+yearsoftrial<-7 #years of trial
+
+#establishing dataframe in the trial function
+survival<-NA
+group<-NA
+enrollment<-NA
+newvalue<-NA
+total<-2*n
+count<-(1:total)
+#'n' is subgroup size
+
+status1<-NA #1=death 0=censored
+status2<-NA
+status<-NA 
+time<-NA
+d<-data.frame(cbind( count, enrollment, group, survival,newvalue, status1, status2, status, time))
+
+
+##function for a singular trial of kaplan meier curve##
+trialsinteraction<-function()
+{
+  group<-rep(c(1,2),each=n) # primary=1 and metastatic=2; n rows created for each treatment (2n total rows)
+  enrollment<-runif(2*n, min=0, max=yearsrecruiting) #enrollment randomly generated from a uniform distribution from 0 to yearsrecruiting
+  subgroup<-rdiscrete(2*n, probs=c(0.4, 0.1,0.1,0.1,0.3))
+  #survival will be different based on subgrouping
+  survival<-c()
+  for(i in 1: length(group)){
+    if(group[i]==1&&subgroup[i]==1){
+      survival[i]<-rexp(1, p1lambda)
+    }
+    else if(group[i]==2&&subgroup[i]==1){
+      survival[i]<-rexp(1, m1lambda)
+    }
+    else if(group[i]==1&&subgroup[i]==2){
+      survival[i]<-rexp(1, p2lambda)
+    }
+    else if(group[i]==2&&subgroup[i]==2){
+      survival[i]<-rexp(1, m2lambda)
+    }
+    else if(group[i]==1&&subgroup[i]==3){
+      survival[i]<-rexp(1, p3lambda)
+    }
+    else if(group[i]==2&&subgroup[i]==3){
+      survival[i]<-rexp(1, m3lambda)
+    }
+    else if(group[i]==1&&subgroup[i]==4){
+      survival[i]<-rexp(1, p4lambda)
+    }
+    else if(group[i]==2&&subgroup[i]==4){
+      survival[i]<-rexp(1, m4lambda)
+    }
+    else if(group[i]==1&&subgroup[i]==5){
+      survival[i]<-rexp(1, p5lambda)
+    }
+    else {
+      survival[i]<-rexp(1, m5lambda)
+    }
+  }
+  
+  ##establishing censor rate of around 10%##
+  censoring<- n%/%5 #20% of data potentially censored (will be around 10% after process); evenly rounded in order to use in sample size estimation (decimals interfere with dataframe size)
+  censoringp<-survival[1:censoring] #the first 20% of primary data marked for potential censoring
+  censoringm<-survival[n+1:censoring] #the first 20% of metastatic data marked for potential censoring
+  
+  
+  #last progress###creates a new column that generates numbers for the marked data from same exponential dataset##
+  censornumberp<-c()
+  for (val in 1: length(censoringp)) {
+    if(subgroup[val]==1){
+      censornumberp[val]<-rexp(1, p1lambda)
+    }
+    else if(subgroup[val]==2){
+      censornumberp[val]<-rexp(1, p2lambda)
+    }
+    else if(subgroup[val]==3){
+      censornumberp[val]<-rexp(1, p3lambda)
+    }
+    else if(subgroup[val]==4){
+      censornumberp[val]<-rexp(1, p4lambda)
+    }
+    else {
+      censornumberp[val]<-rexp(1, p5lambda)
+    }
+  } 
+  censornumberm<-c()
+  for (val in 1: length(censoringm)){
+    if(subgroup[val]==1){
+      censornumberm[val]<-rexp(1, m1lambda)
+    }
+    else if(subgroup[val]==2){
+      censornumberm[val]<-rexp(1, m2lambda)
+    }
+    else if(subgroup[val]==3){
+      censornumberm[val]<-rexp(1, m3lambda)
+    }
+    else if(subgroup[val]==4){
+      censornumberm[val]<-rexp(1, m4lambda)
+    }
+    else {
+      censornumberm[val]<-rexp(1, m5lambda)
+    }
+  } 
+  
+  d<- data.frame(survival,group, enrollment, subgroup)
+  d['newvalue']<-NA
+  d['status1']<-NA #1=death 0=censored
+  d['status2']<-NA
+  d['status']<-NA 
+
+  
+  
+  ##random censoring##
+  for (i in 1:length(censoringp)){
+    ifelse(censoringp[i]<censornumberp[i], d$newvalue[i]<-survival[i], d$newvalue[i]<-censornumberp[i])
+  } #if the potential censor value is less than the original survival time, subject is censored.  This change in time or lack of change is represented by newvalue
+  
+  for (i in 1:length(censoringm)){
+    ifelse(censoringm[i]<censornumberm[i], d$newvalue[n+i]<-survival[n+i], d$newvalue[n+i]<-censornumberm[i])
+  }#same process but with metastatic patients
+  
+  for (i in 1:length(survival)){
+    if (is.na(d$newvalue[i])){
+      d$newvalue[i]<-survival[i]
+    }
+  }
+  ##marks censored data based off of randomness##
+  for (i in 1:length(survival)){
+    ifelse(d$newvalue[i]<survival[i], d$status1[i]<-0, d$status1[i]<-1)
+  } 
+  
+  time<-d$newvalue+enrollment
+  d<-data.frame(d, time)
+  ##censors if time is more than yearsoftrial##
+  for (i in 1: length(survival)){
+    ifelse(time[i]>yearsoftrial, d$status2[i]<-0, d$status2[i]<-1)
+  } #marks as censored in status2 if time>yearsoftrial
+  
+  for(i in 1:length(survival)){
+    ifelse(d$status2[i]==0,d$newvalue[i]<-yearsoftrial-enrollment[i],d$newvalue[i]<-d$newvalue[i])
+  } #if censored, newvalue (variable being analyzed in km curve) is yearsoftrial minus enrollment, otherwise newvalue remains initial survival time
+  
+  
+  
+  
+  
+  ##marks as censored in new variable status if censored either due to time or randomness##
+  for(i in 1:length(survival)){
+    ifelse(d$status1[i]==0|d$status2[i]==0, d$status[i]<-0, d$status[i]<-1)
+  }
+  
+  
+  ##cox model##
+  coxmodel<-coxph(Surv(d$newvalue, d$status)~group*subgroup, data=d)  #creates curve model of newvalue, censored by status, and sorted by group
+  a<-summary(coxmodel)
+  coeffs<-coefficients(a)
+  p<-coeffs[3,5]#stores p value of interaction term
+  
+  
+}  
+
+p_vals<-replicate(replications, trialsinteraction()) #stores returned p value for x replications
+hist(p_vals, breaks= seq(0,1, length.out=21), labels=TRUE) #histogram of generated p values with 20 bins (to show 0.05 bin on its own)
+mean(p_vals<0.1)
