@@ -16,14 +16,14 @@ mlambda<-log(2)/mmedian #finds lambda for which median of exp curve would be mme
 #subgroup medians
 p1median<-3; p1lambda<-log(2)/p1median
 m1median<-2; m1lambda<-log(2)/m1median
-p2median<-2; p2lambda<-log(2)/p2median
-m2median<-3; m2lambda<-log(2)/m2median
-p3median<-2; p3lambda<-log(2)/p3median
-m3median<-3; m3lambda<-log(2)/m3median
-p4median<-3; p4lambda<-log(2)/p4median
-m4median<-2; m4lambda<-log(2)/m4median
-p5median<-3; p5lambda<-log(2)/p5median
-m5median<-2; m5lambda<-log(2)/m5median
+p2median<-3; p2lambda<-log(2)/p2median
+m2median<-2; m2lambda<-log(2)/m2median
+p3median<-3; p3lambda<-log(2)/p3median
+m3median<-2; m3lambda<-log(2)/m3median
+p4median<-2; p4lambda<-log(2)/p4median
+m4median<-3; m4lambda<-log(2)/m4median
+p5median<-2; p5lambda<-log(2)/p5median
+m5median<-3; m5lambda<-log(2)/m5median
 replications<-100
 alpha<-0.1
 beta<-0.1
